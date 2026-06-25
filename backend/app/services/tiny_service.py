@@ -78,18 +78,11 @@ def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
         )
         resp.raise_for_status()
         content = resp.text.strip()
-        # XML de erro do Tiny: <retorno><status>Erro</status>...
-        if "<status>Erro</status>" in content or "<status_processamento>2</status_processamento>" in content:
+        # Retorna None apenas se for explicitamente erro
+        if "<status>Erro</status>" in content:
             return None
-        if "xml_nfe" in content:
-            # Envelope Tiny: extrai o conteúdo interno
-            start = content.find("<nfeProc")
-            if start == -1:
-                start = content.find("<NFe")
-            if start != -1:
-                end = content.rfind("</xml_nfe>")
-                return content[start:end] if end != -1 else content[start:]
-        if content.startswith("<?xml") or content.startswith("<nfeProc") or content.startswith("<NFe"):
+        # Retorna o conteúdo completo — o regex da chave funciona no envelope inteiro
+        if "nfeProc" in content or "NFe" in content:
             return content
         return None
     except Exception as e:
