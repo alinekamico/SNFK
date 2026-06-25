@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Usuario, AuditLog
+from app.models import Usuario, AuditLog, ResetToken
 from app.schemas.usuario import LoginRequest, TokenResponse, UsuarioCreate, UsuarioResponse
 from app.services.auth_service import (
     hash_senha, verificar_senha, criar_access_token,
     criar_refresh_token, decodificar_token
 )
+from app.services.email_service import enviar_reset_senha
+from pydantic import BaseModel, EmailStr
+from datetime import datetime, timedelta
+import secrets
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -63,3 +67,46 @@ def criar_usuario(body: UsuarioCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+class EsqueciSenhaRequest(BaseModel):
+    email: EmailStr
+
+
+class RedefinirSenhaRequest(BaseModel):
+    token: str
+    nova_senha: str
+
+
+@router.post("/esqueci-senha", status_code=200)
+def esqueci_senha(body: EsqueciSenhaRequest, db: Session = Depends(get_db)):
+    usuario = db.query(Usuario).filter(Usuario.email == body.email, Usuario.ativo == True).first()
+    if usuario:
+        token = secrets.token_urlsafe(32)
+        reset = ResetToken(
+            user_id=usuario.id,
+            token=token,
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+        )
+        db.add(reset)
+        db.commit()
+        enviar_reset_senha(usuario.email, usuario.nome, token)
+    return {"detail": "Se o e-mail estiver cadastrado, você receberá as instruções em breve."}
+
+
+@router.post("/redefinir-senha", status_code=200)
+def redefinir_senha(body: RedefinirSenhaRequest, db: Session = Depends(get_db)):
+    reset = db.query(ResetToken).filter(
+        ResetToken.token == body.token,
+        ResetToken.usado == False,
+        ResetToken.expires_at > datetime.utcnow(),
+    ).first()
+    if not reset:
+        raise HTTPException(status_code=400, detail="Link inválido ou expirado")
+    usuario = db.query(Usuario).filter(Usuario.id == reset.user_id).first()
+    if not usuario:
+        raise HTTPException(status_code=400, detail="Usuário não encontrado")
+    usuario.senha_hash = hash_senha(body.nova_senha)
+    reset.usado = True
+    db.commit()
+    return {"detail": "Senha redefinida com sucesso"}

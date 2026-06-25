@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = "./storage"
     CERTS_PATH: str = "./certs"
     COLLECTION_INTERVAL_MINUTES: int = 60
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    EMAIL_FROM: str = "noreply@kamico.com.br"
+    FRONTEND_URL: str = "http://54.173.44.220:8080"
 
     class Config:
         env_file = ".env"

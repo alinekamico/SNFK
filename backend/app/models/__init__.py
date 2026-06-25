@@ -4,3 +4,4 @@ from app.models.documento import Documento, TipoDocumento, FonteDocumento
 from app.models.usuario import Usuario, PerfilUsuario
 from app.models.coleta_cursor import ColetaCursor
 from app.models.audit_log import AuditLog
+from app.models.reset_token import ResetToken
