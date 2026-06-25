@@ -18,6 +18,9 @@ class Empresa(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    tiny_token = Column(String(255))   # token API Tiny v3 por empresa
+    usuarios = relationship("Usuario", back_populates="empresa")
+
     certificados = relationship("Certificado", back_populates="empresa", cascade="all, delete-orphan")
     documentos = relationship("Documento", back_populates="empresa", cascade="all, delete-orphan")
     coleta_cursors = relationship("ColetaCursor", back_populates="empresa", cascade="all, delete-orphan")

@@ -22,6 +22,7 @@ class Usuario(Base):
     senha_hash = Column(String(255), nullable=False)
     perfil = Column(Enum(PerfilUsuario), default=PerfilUsuario.USER)
     empresa_id = Column(CHAR(36), ForeignKey("empresas.id"), nullable=True)  # null = acesso a todas
+    empresa = relationship("Empresa", back_populates="usuarios")
     ativo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

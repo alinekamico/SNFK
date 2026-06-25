@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     SMTP_PASS: str = ""
     EMAIL_FROM: str = "noreply@kamico.com.br"
     FRONTEND_URL: str = "http://54.173.44.220:8080"
+    UNO_BASE_URL: str = "https://kami.omegasoft.net.br/Kami-api/predict/v1"
+    UNO_TOKEN: str = ""
 
     class Config:
         env_file = ".env"

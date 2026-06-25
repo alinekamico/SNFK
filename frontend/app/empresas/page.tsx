@@ -6,7 +6,7 @@ import api from '@/lib/api'
 import { isAuthenticated } from '@/lib/auth'
 import { Plus, Building2 } from 'lucide-react'
 
-interface Empresa { id: string; razao_social: string; nome_fantasia?: string; cnpj: string; email?: string; ativa: boolean }
+interface Empresa { id: string; razao_social: string; nome_fantasia?: string; cnpj: string; email?: string; ativa: boolean; tiny_token?: string }
 
 function formatCNPJ(v: string) {
   const d = v.replace(/\D/g, '').slice(0, 14)
@@ -21,7 +21,7 @@ export default function EmpresasPage() {
   const router = useRouter()
   const [empresas, setEmpresas] = useState<Empresa[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', email: '' })
+  const [form, setForm] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '' })
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -44,7 +44,7 @@ export default function EmpresasPage() {
     try {
       await api.post('/empresas', { ...form, cnpj: cnpjNumeros })
       setShowForm(false)
-      setForm({ razao_social: '', nome_fantasia: '', cnpj: '', email: '' })
+      setForm({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '' })
       load()
     } catch (err: any) {
       setErro(err?.response?.data?.detail || 'Erro ao salvar empresa')
@@ -84,6 +84,11 @@ export default function EmpresasPage() {
                 <p className="text-xs text-kami-charcoal/50 font-body -mt-1">Digite os 14 dígitos do CNPJ</p>
                 <input type="email" placeholder="E-mail" value={form.email}
                   onChange={e => setForm(f => ({...f, email: e.target.value}))} className={inputClass} />
+                <div className="border-t border-kami-charcoal/10 pt-3 mt-1">
+                  <p className="text-xs font-body text-kami-charcoal/50 mb-2 uppercase tracking-wider">Integrações</p>
+                  <input placeholder="Token API Tiny (opcional)" value={form.tiny_token}
+                    onChange={e => setForm(f => ({...f, tiny_token: e.target.value}))} className={inputClass} />
+                </div>
                 {erro && <p className="text-kami-red text-sm font-body">{erro}</p>}
                 <div className="flex gap-2 justify-end pt-2">
                   <button type="button" onClick={() => setShowForm(false)}

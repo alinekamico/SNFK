@@ -19,19 +19,21 @@ class EmpresaBase(BaseModel):
 
 
 class EmpresaCreate(EmpresaBase):
-    pass
+    tiny_token: Optional[str] = None
 
 
 class EmpresaUpdate(BaseModel):
-    razao_social: Optional[str]
-    nome_fantasia: Optional[str]
-    email: Optional[str]
-    ativa: Optional[bool]
+    razao_social: Optional[str] = None
+    nome_fantasia: Optional[str] = None
+    email: Optional[str] = None
+    ativa: Optional[bool] = None
+    tiny_token: Optional[str] = None
 
 
 class EmpresaResponse(EmpresaBase):
     id: str
     ativa: bool
+    tiny_token: Optional[str] = None
     created_at: datetime
 
     class Config:
