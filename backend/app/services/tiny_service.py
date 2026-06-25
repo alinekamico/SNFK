@@ -48,18 +48,24 @@ def listar_nfe_emitidas(
 def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
     """Obtém XML de uma NF-e no Tiny v2."""
     try:
-        params = {"token": token, "formato": "JSON", "id": id_nota}
+        params = {"token": token, "id": id_nota}
         resp = requests.get(
             f"{TINY_BASE_URL}/nota.fiscal.obter.xml.php",
             params=params,
             timeout=30,
         )
         resp.raise_for_status()
-        data = resp.json()
-        retorno = data.get("retorno", {})
-        if retorno.get("status") != "OK":
+        # Tiny v2 retorna XML direto ou JSON com xml embutido
+        content = resp.text.strip()
+        if content.startswith("<?xml") or content.startswith("<"):
+            return content
+        # Tenta JSON
+        try:
+            data = resp.json()
+            retorno = data.get("retorno", {})
+            return retorno.get("xml_nfe") or retorno.get("xml")
+        except Exception:
             return None
-        return retorno.get("xml_nfe") or retorno.get("xml")
     except Exception as e:
         logger.error(f"Erro Tiny v2 obter XML {id_nota}: {e}")
         return None
@@ -68,15 +74,24 @@ def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
 def obter_danfe(token: str, id_nota: str) -> Optional[bytes]:
     """Obtém PDF do DANFe no Tiny v2."""
     try:
-        params = {"token": token, "id": id_nota}
+        # Tiny v2: primeiro obtém a nota para pegar o link do DANFe
+        params = {"token": token, "id": id_nota, "formato": "JSON"}
         resp = requests.get(
-            f"{TINY_BASE_URL}/gerar.danfe.php",
+            f"{TINY_BASE_URL}/nota.fiscal.obter.php",
             params=params,
-            timeout=60,
+            timeout=30,
         )
         resp.raise_for_status()
-        if b"%PDF" in resp.content[:10]:
-            return resp.content
+        data = resp.json()
+        retorno = data.get("retorno", {})
+        nota = retorno.get("nota_fiscal", {})
+        link = nota.get("link_danfe") or nota.get("linkDanfe") or nota.get("url_danfe")
+        if not link:
+            return None
+        r2 = requests.get(link, timeout=60)
+        r2.raise_for_status()
+        if b"%PDF" in r2.content[:10]:
+            return r2.content
         return None
     except Exception as e:
         logger.error(f"Erro Tiny v2 obter DANFe {id_nota}: {e}")
