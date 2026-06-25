@@ -4,14 +4,7 @@ from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-TINY_BASE_URL = "https://api.tiny.com.br/public-api/v3"
-
-
-def _headers(token: str) -> dict:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+TINY_BASE_URL = "https://api.tiny.com.br/api2"
 
 
 def listar_nfe_emitidas(
@@ -22,13 +15,9 @@ def listar_nfe_emitidas(
     pagina: int = 1,
     limite: int = 100,
 ) -> Dict:
-    """
-    Lista NF-e emitidas no Tiny v3.
-    situacao: A=Autorizada, C=Cancelada, E=Em digitação, etc.
-    data_inicial/data_final: dd/MM/yyyy
-    """
+    """Lista NF-e no Tiny API v2. situacao: A=Autorizada, C=Cancelada"""
     try:
-        params = {"pagina": pagina, "limite": limite}
+        params = {"token": token, "formato": "JSON", "pagina": pagina}
         if situacao:
             params["situacao"] = situacao
         if data_inicial:
@@ -37,66 +26,58 @@ def listar_nfe_emitidas(
             params["dataFinal"] = data_final
 
         resp = requests.get(
-            f"{TINY_BASE_URL}/nota-fiscal",
-            headers=_headers(token),
+            f"{TINY_BASE_URL}/notas.fiscais.pesquisa.php",
             params=params,
             timeout=30,
         )
         resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        logger.error(f"Erro Tiny v3 listar NF-e: {e}")
-        return {"itens": [], "paginacao": {}}
+        data = resp.json()
+        retorno = data.get("retorno", {})
+        if retorno.get("status") != "OK":
+            logger.warning(f"Tiny v2 status não OK: {retorno.get('erros')}")
+            return {"itens": [], "paginas": 1}
 
-
-def obter_nfe(token: str, id_nota: str) -> Optional[Dict]:
-    """Obtém dados de uma NF-e específica no Tiny v3."""
-    try:
-        resp = requests.get(
-            f"{TINY_BASE_URL}/nota-fiscal/{id_nota}",
-            headers=_headers(token),
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return resp.json()
+        notas = retorno.get("notas_fiscais", [])
+        itens = [n["nota_fiscal"] for n in notas if "nota_fiscal" in n]
+        return {"itens": itens, "paginas": int(retorno.get("numero_paginas", 1))}
     except Exception as e:
-        logger.error(f"Erro Tiny v3 obter NF-e {id_nota}: {e}")
-        return None
+        logger.error(f"Erro Tiny v2 listar NF-e: {e}")
+        return {"itens": [], "paginas": 1}
 
 
 def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
-    """Obtém XML de uma NF-e no Tiny v3."""
+    """Obtém XML de uma NF-e no Tiny v2."""
     try:
+        params = {"token": token, "formato": "JSON", "id": id_nota}
         resp = requests.get(
-            f"{TINY_BASE_URL}/nota-fiscal/{id_nota}/xml",
-            headers=_headers(token),
+            f"{TINY_BASE_URL}/nota.fiscal.obter.xml.php",
+            params=params,
             timeout=30,
         )
         resp.raise_for_status()
         data = resp.json()
-        return data.get("xml") or data.get("xmlNfe")
+        retorno = data.get("retorno", {})
+        if retorno.get("status") != "OK":
+            return None
+        return retorno.get("xml_nfe") or retorno.get("xml")
     except Exception as e:
-        logger.error(f"Erro Tiny v3 obter XML {id_nota}: {e}")
+        logger.error(f"Erro Tiny v2 obter XML {id_nota}: {e}")
         return None
 
 
 def obter_danfe(token: str, id_nota: str) -> Optional[bytes]:
-    """Obtém PDF do DANFe no Tiny v3."""
+    """Obtém PDF do DANFe no Tiny v2."""
     try:
+        params = {"token": token, "id": id_nota}
         resp = requests.get(
-            f"{TINY_BASE_URL}/nota-fiscal/{id_nota}/danfe",
-            headers=_headers(token),
+            f"{TINY_BASE_URL}/gerar.danfe.php",
+            params=params,
             timeout=60,
         )
         resp.raise_for_status()
-        if "pdf" in resp.headers.get("content-type", ""):
+        if b"%PDF" in resp.content[:10]:
             return resp.content
-        # Tiny v3 pode retornar JSON com URL
-        data = resp.json()
-        if data.get("linkDanfe"):
-            r2 = requests.get(data["linkDanfe"], timeout=60)
-            return r2.content
         return None
     except Exception as e:
-        logger.error(f"Erro Tiny v3 obter DANFe {id_nota}: {e}")
+        logger.error(f"Erro Tiny v2 obter DANFe {id_nota}: {e}")
         return None

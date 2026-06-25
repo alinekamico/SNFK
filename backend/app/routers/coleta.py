@@ -101,66 +101,73 @@ def disparar_coleta_uno(
 
 def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
     logger.info(f"Iniciando coleta Tiny para {empresa.razao_social} ({dt_ini} a {dt_fim})")
-    resultado = tiny_service.listar_nfe_emitidas(
-        token=empresa.tiny_token,
-        situacao="A",
-        data_inicial=dt_ini,
-        data_final=dt_fim,
-    )
-    itens = resultado.get("itens", [])
+    pagina = 1
     novos = 0
-    for item in itens:
-        id_nota = str(item.get("id") or item.get("idNotaFiscal") or "")
-        chave = str(item.get("chaveAcesso") or item.get("chave") or "")
-        if not chave or len(chave) != 44:
-            continue
-        if db.query(Documento).filter(Documento.chave_acesso == chave).first():
-            continue
-
-        xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
-        xml_path = None
-        if xml:
-            pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
-            xml_path = _salvar_arquivo(xml, pasta, f"{chave}.xml")
-
-        danfe = tiny_service.obter_danfe(empresa.tiny_token, id_nota)
-        danfe_path = None
-        if danfe:
-            pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
-            danfe_path = _salvar_arquivo(danfe, pasta, f"{chave}.pdf")
-
-        dt_emissao = None
-        try:
-            dt_str = item.get("dataEmissao") or item.get("dtEmissao") or ""
-            if dt_str:
-                for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
-                    try:
-                        dt_emissao = datetime.strptime(dt_str, fmt)
-                        break
-                    except ValueError:
-                        continue
-        except Exception:
-            pass
-
-        doc = Documento(
-            empresa_id=empresa.id,
-            chave_acesso=chave,
-            tipo="emitida",
-            fonte="tiny",
-            cnpj_emitente=empresa.cnpj,
-            razao_emitente=empresa.razao_social,
-            cnpj_destinatario=str(item.get("cnpjDestinatario") or ""),
-            razao_destinatario=str(item.get("nomeDestinatario") or ""),
-            numero_nota=str(item.get("numero") or ""),
-            serie=str(item.get("serie") or ""),
-            data_emissao=dt_emissao,
-            valor_total=float(item.get("valorTotal") or item.get("vlTotal") or 0),
-            xml_path=xml_path,
-            danfe_path=danfe_path,
-            status="Autorizada",
+    while True:
+        resultado = tiny_service.listar_nfe_emitidas(
+            token=empresa.tiny_token,
+            situacao="A",
+            data_inicial=dt_ini,
+            data_final=dt_fim,
+            pagina=pagina,
         )
-        db.add(doc)
-        novos += 1
+        itens = resultado.get("itens", [])
+        if not itens:
+            break
+
+        for item in itens:
+            id_nota = str(item.get("id") or "")
+            chave = str(item.get("chave_acesso") or "")
+            if not chave or len(chave) != 44:
+                continue
+            if db.query(Documento).filter(Documento.chave_acesso == chave).first():
+                continue
+
+            xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
+            xml_path = None
+            if xml:
+                pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
+                xml_path = _salvar_arquivo(xml, pasta, f"{chave}.xml")
+
+            danfe = tiny_service.obter_danfe(empresa.tiny_token, id_nota)
+            danfe_path = None
+            if danfe:
+                pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
+                danfe_path = _salvar_arquivo(danfe, pasta, f"{chave}.pdf")
+
+            dt_emissao = None
+            try:
+                dt_str = item.get("data_emissao") or ""
+                if dt_str:
+                    dt_emissao = datetime.strptime(dt_str, "%d/%m/%Y")
+            except Exception:
+                pass
+
+            cliente = item.get("cliente") or {}
+            doc = Documento(
+                empresa_id=empresa.id,
+                chave_acesso=chave,
+                tipo="emitida",
+                fonte="tiny",
+                cnpj_emitente=empresa.cnpj,
+                razao_emitente=empresa.razao_social,
+                cnpj_destinatario=str(cliente.get("cpf_cnpj") or "").replace(".", "").replace("/", "").replace("-", ""),
+                razao_destinatario=str(cliente.get("nome") or item.get("nome") or ""),
+                numero_nota=str(item.get("numero") or ""),
+                serie=str(item.get("serie") or ""),
+                data_emissao=dt_emissao,
+                valor_total=float(item.get("valor_total") or 0),
+                xml_path=xml_path,
+                danfe_path=danfe_path,
+                status="Autorizada",
+            )
+            db.add(doc)
+            novos += 1
+
+        paginas = resultado.get("paginas", 1)
+        if pagina >= paginas:
+            break
+        pagina += 1
 
     db.commit()
     logger.info(f"Coleta Tiny {empresa.razao_social}: {novos} novas NF-e")
