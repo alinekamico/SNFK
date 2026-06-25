@@ -10,6 +10,7 @@ from typing import Optional
 import logging
 import os
 import re
+import time
 
 router = APIRouter(prefix="/coleta", tags=["coleta"])
 logger = logging.getLogger(__name__)
@@ -122,6 +123,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
                 continue
 
             # Obtém XML para extrair chave de acesso
+            time.sleep(0.5)  # evita rate limit do Tiny
             xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
             chave = None
             if xml:
