@@ -9,6 +9,7 @@ from datetime import datetime, date
 from typing import Optional
 import logging
 import os
+import re
 
 router = APIRouter(prefix="/coleta", tags=["coleta"])
 logger = logging.getLogger(__name__)
@@ -120,18 +121,22 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
             if not id_nota:
                 continue
 
-            # Busca detalhes completos para obter chave de acesso
-            detalhe = tiny_service.obter_nfe(empresa.tiny_token, id_nota)
-            if not detalhe:
-                continue
-            chave = str(detalhe.get("chave_acesso") or "").replace(" ", "")
-            if not chave or len(chave) != 44:
-                logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso válida, pulando")
+            # Obtém XML para extrair chave de acesso
+            xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
+            chave = None
+            if xml:
+                m = re.search(r'<chNFe>(\d{44})</chNFe>', xml)
+                if not m:
+                    m = re.search(r'Id="NFe(\d{44})"', xml)
+                if m:
+                    chave = m.group(1)
+
+            if not chave:
+                logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso no XML, pulando")
                 continue
             if db.query(Documento).filter(Documento.chave_acesso == chave).first():
                 continue
 
-            xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
             xml_path = None
             if xml:
                 pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
@@ -164,7 +169,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
                 numero_nota=str(item.get("numero") or ""),
                 serie=str(item.get("serie") or ""),
                 data_emissao=dt_emissao,
-                valor_total=float(item.get("valor") or 0),
+                valor_total=float(item.get("valor") or item.get("valor_nota") or 0),
                 xml_path=xml_path,
                 danfe_path=danfe_path,
                 status="Autorizada",
