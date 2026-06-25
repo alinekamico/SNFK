@@ -19,7 +19,9 @@ def listar_nfe_emitidas(
     try:
         params = {"token": token, "formato": "JSON", "pagina": pagina}
         if situacao:
-            params["situacao"] = situacao
+            # Tiny v2: 6=Autorizada, 3=Cancelada, 1=Pendente, 5=Rejeitada, 8=Registrada
+            SITUACAO_MAP = {"A": "6", "C": "3", "P": "1"}
+            params["situacao"] = SITUACAO_MAP.get(situacao, situacao)
         if data_inicial:
             params["dataInicial"] = data_inicial
         if data_final:
