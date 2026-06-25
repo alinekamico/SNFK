@@ -45,6 +45,26 @@ def listar_nfe_emitidas(
         return {"itens": [], "paginas": 1}
 
 
+def obter_nfe(token: str, id_nota: str) -> Optional[Dict]:
+    """Obtém detalhes completos de uma NF-e no Tiny v2, incluindo chave e links."""
+    try:
+        params = {"token": token, "id": id_nota, "formato": "JSON"}
+        resp = requests.get(
+            f"{TINY_BASE_URL}/nota.fiscal.obter.php",
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        retorno = data.get("retorno", {})
+        if retorno.get("status") != "OK":
+            return None
+        return retorno.get("nota_fiscal")
+    except Exception as e:
+        logger.error(f"Erro Tiny v2 obter NF-e {id_nota}: {e}")
+        return None
+
+
 def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
     """Obtém XML de uma NF-e no Tiny v2."""
     try:
@@ -55,11 +75,9 @@ def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
             timeout=30,
         )
         resp.raise_for_status()
-        # Tiny v2 retorna XML direto ou JSON com xml embutido
         content = resp.text.strip()
-        if content.startswith("<?xml") or content.startswith("<"):
+        if content.startswith("<?xml") or content.startswith("<nfeProc") or content.startswith("<NFe"):
             return content
-        # Tenta JSON
         try:
             data = resp.json()
             retorno = data.get("retorno", {})
@@ -72,19 +90,11 @@ def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
 
 
 def obter_danfe(token: str, id_nota: str) -> Optional[bytes]:
-    """Obtém PDF do DANFe no Tiny v2."""
+    """Obtém PDF do DANFe via link retornado nos detalhes da NF-e."""
     try:
-        # Tiny v2: primeiro obtém a nota para pegar o link do DANFe
-        params = {"token": token, "id": id_nota, "formato": "JSON"}
-        resp = requests.get(
-            f"{TINY_BASE_URL}/nota.fiscal.obter.php",
-            params=params,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        retorno = data.get("retorno", {})
-        nota = retorno.get("nota_fiscal", {})
+        nota = obter_nfe(token, id_nota)
+        if not nota:
+            return None
         link = nota.get("link_danfe") or nota.get("linkDanfe") or nota.get("url_danfe")
         if not link:
             return None

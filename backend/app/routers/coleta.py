@@ -117,8 +117,16 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
 
         for item in itens:
             id_nota = str(item.get("id") or "")
-            chave = str(item.get("chave_acesso") or "")
+            if not id_nota:
+                continue
+
+            # Busca detalhes completos para obter chave de acesso
+            detalhe = tiny_service.obter_nfe(empresa.tiny_token, id_nota)
+            if not detalhe:
+                continue
+            chave = str(detalhe.get("chave_acesso") or "").replace(" ", "")
             if not chave or len(chave) != 44:
+                logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso válida, pulando")
                 continue
             if db.query(Documento).filter(Documento.chave_acesso == chave).first():
                 continue
@@ -156,7 +164,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
                 numero_nota=str(item.get("numero") or ""),
                 serie=str(item.get("serie") or ""),
                 data_emissao=dt_emissao,
-                valor_total=float(item.get("valor_total") or 0),
+                valor_total=float(item.get("valor") or 0),
                 xml_path=xml_path,
                 danfe_path=danfe_path,
                 status="Autorizada",
