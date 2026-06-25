@@ -94,13 +94,18 @@ def consultar_nfe_distribuicao(
     try:
         for tentativa in range(1, max_tentativas + 1):
             try:
+                import certifi, ssl, os
+                # Usa bundle do sistema que inclui ICP-Brasil após update-ca-certificates
+                ca_bundle = "/etc/ssl/certs/ca-certificates.crt"
+                if not os.path.exists(ca_bundle):
+                    ca_bundle = certifi.where()
                 resp = requests.post(
                     url,
                     data=soap_body.encode("utf-8"),
                     headers=headers,
                     cert=(cert_tmp, key_tmp),
                     timeout=60,
-                    verify=True,
+                    verify=ca_bundle,
                 )
                 resp.raise_for_status()
                 return _parsear_resposta(resp.text)
