@@ -7,8 +7,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a5f' },
-        kami: { DEFAULT: '#1e3a5f', light: '#2563eb' },
+        kami: {
+          red:        '#E2042A',
+          'red-light':'#F03554',
+          charcoal:   '#463E3F',
+          cream:      '#EFEEE8',
+        },
+      },
+      fontFamily: {
+        heading: ['Ramabhadra', 'sans-serif'],
+        body:    ['Poppins', 'sans-serif'],
       },
     },
   },
