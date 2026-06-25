@@ -37,7 +37,7 @@ def listar_nfe_emitidas(
             params["dataFinal"] = data_final
 
         resp = requests.get(
-            f"{TINY_BASE_URL}/nota-fiscal/pesquisa",
+            f"{TINY_BASE_URL}/nota-fiscal",
             headers=_headers(token),
             params=params,
             timeout=30,
