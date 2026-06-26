@@ -90,20 +90,30 @@ def obter_xml_nfe(token: str, id_nota: str) -> Optional[str]:
         return None
 
 
-def obter_danfe(token: str, id_nota: str) -> Optional[bytes]:
-    """Obtém PDF do DANFe via link retornado nos detalhes da NF-e."""
+def gerar_danfe_do_xml(xml_content: str) -> Optional[bytes]:
+    """Gera PDF do DANFe a partir do XML da NF-e usando brazilfiscalreport."""
     try:
-        nota = obter_nfe(token, id_nota)
-        if not nota:
+        from brazilfiscalreport.danfe import Danfe
+        import io
+        import re
+
+        # Extrai o XML puro do envelope do Tiny
+        start = xml_content.find("<nfeProc")
+        if start == -1:
+            start = xml_content.find("<NFe")
+        if start == -1:
             return None
-        link = nota.get("link_danfe") or nota.get("linkDanfe") or nota.get("url_danfe")
-        if not link:
-            return None
-        r2 = requests.get(link, timeout=60)
-        r2.raise_for_status()
-        if b"%PDF" in r2.content[:10]:
-            return r2.content
-        return None
+        end = xml_content.rfind("</nfeProc>")
+        if end != -1:
+            xml_puro = xml_content[start:end + len("</nfeProc>")]
+        else:
+            xml_puro = xml_content[start:]
+
+        xml_bytes = xml_puro.encode("utf-8")
+        pdf_buffer = io.BytesIO()
+        danfe = Danfe(xml=xml_bytes)
+        danfe.output(pdf_buffer)
+        return pdf_buffer.getvalue()
     except Exception as e:
-        logger.error(f"Erro Tiny v2 obter DANFe {id_nota}: {e}")
+        logger.error(f"Erro ao gerar DANFe do XML: {e}")
         return None

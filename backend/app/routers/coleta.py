@@ -124,31 +124,28 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
 
             # Obtém XML para extrair chave de acesso
             time.sleep(0.5)  # evita rate limit do Tiny
-            xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
-            chave = None
-            if xml:
-                m = re.search(r'<chNFe>(\d{44})</chNFe>', xml)
-                if not m:
-                    m = re.search(r'Id="NFe(\d{44})"', xml)
-                if m:
-                    chave = m.group(1)
 
-            if not chave:
-                logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso no XML, pulando")
+            # Obtém detalhes para pegar chave_acesso diretamente
+            detalhe = tiny_service.obter_nfe(empresa.tiny_token, id_nota)
+            chave = str(detalhe.get("chave_acesso") or "").strip() if detalhe else ""
+            if not chave or len(chave) != 44:
+                logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso, pulando")
                 continue
             if db.query(Documento).filter(Documento.chave_acesso == chave).first():
                 continue
 
+            xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
             xml_path = None
             if xml:
                 pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
                 xml_path = _salvar_arquivo(xml, pasta, f"{chave}.xml")
 
-            danfe = tiny_service.obter_danfe(empresa.tiny_token, id_nota)
             danfe_path = None
-            if danfe:
-                pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
-                danfe_path = _salvar_arquivo(danfe, pasta, f"{chave}.pdf")
+            if xml:
+                danfe = tiny_service.gerar_danfe_do_xml(xml)
+                if danfe:
+                    pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
+                    danfe_path = _salvar_arquivo(danfe, pasta, f"{chave}.pdf")
 
             dt_emissao = None
             try:
@@ -171,7 +168,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
                 numero_nota=str(item.get("numero") or ""),
                 serie=str(item.get("serie") or ""),
                 data_emissao=dt_emissao,
-                valor_total=float(item.get("valor") or item.get("valor_nota") or 0),
+                valor_total=float(detalhe.get("valor_nota") or item.get("valor") or 0),
                 xml_path=xml_path,
                 danfe_path=danfe_path,
                 status="Autorizada",
