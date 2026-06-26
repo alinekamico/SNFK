@@ -13,14 +13,34 @@ logger = logging.getLogger(__name__)
 
 
 def executar_coleta_todas_empresas(session_factory):
+    from app.routers.coleta import _coletar_tiny, _coletar_uno
+    from datetime import date
+
     db: Session = session_factory()
     try:
         empresas = db.query(Empresa).filter(Empresa.ativa == True).all()
+        dt_ini = date.today().replace(day=1).strftime("%d/%m/%Y")
+        dt_fim = date.today().strftime("%d/%m/%Y")
+
         for empresa in empresas:
+            # SEFAZ
             try:
                 coletar_sefaz(db, empresa)
             except Exception as e:
                 logger.error(f"Erro coleta SEFAZ empresa {empresa.cnpj}: {e}")
+
+            # Tiny
+            if empresa.tiny_token:
+                try:
+                    _coletar_tiny(db, empresa, dt_ini, dt_fim)
+                except Exception as e:
+                    logger.error(f"Erro coleta Tiny empresa {empresa.cnpj}: {e}")
+
+        # UNO (global)
+        try:
+            _coletar_uno(db, dt_ini, dt_fim)
+        except Exception as e:
+            logger.error(f"Erro coleta UNO: {e}")
     finally:
         db.close()
 
