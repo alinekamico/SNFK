@@ -56,6 +56,14 @@ def listar_documentos(
     return result
 
 
+@router.get("/stats")
+def stats_documentos(db: Session = Depends(get_db)):
+    total = db.query(Documento).count()
+    recebidas = db.query(Documento).filter(Documento.tipo == "recebida").count()
+    emitidas = db.query(Documento).filter(Documento.tipo == "emitida").count()
+    return {"total": total, "recebidas": recebidas, "emitidas": emitidas}
+
+
 @router.get("/{doc_id}/xml")
 def download_xml(doc_id: str, db: Session = Depends(get_db)):
     doc = db.query(Documento).filter(Documento.id == doc_id).first()

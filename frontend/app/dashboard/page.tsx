@@ -18,10 +18,15 @@ export default function Dashboard() {
       return
     }
     Promise.all([
-      api.get('/documentos?per_page=1').catch(() => ({ data: [] })),
+      api.get('/documentos/stats').catch(() => ({ data: { total: 0, recebidas: 0, emitidas: 0 } })),
       api.get('/empresas').catch(() => ({ data: [] })),
-    ]).then(([, emps]) => {
-      setStats(s => ({ ...s, empresas: Array.isArray(emps.data) ? emps.data.length : 0 }))
+    ]).then(([statsData, emps]) => {
+      setStats({
+        total: statsData.data.total ?? 0,
+        recebidas: statsData.data.recebidas ?? 0,
+        emitidas: statsData.data.emitidas ?? 0,
+        empresas: Array.isArray(emps.data) ? emps.data.length : 0,
+      })
     })
   }, [router])
 
