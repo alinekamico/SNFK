@@ -140,12 +140,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
                 pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
                 xml_path = _salvar_arquivo(xml, pasta, f"{chave}.xml")
 
-            danfe_path = None
-            if xml:
-                danfe = tiny_service.gerar_danfe_do_xml(xml)
-                if danfe:
-                    pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
-                    danfe_path = _salvar_arquivo(danfe, pasta, f"{chave}.pdf")
+            danfe_path = None  # DANFe gerado on-demand no download
 
             dt_emissao = None
             try:

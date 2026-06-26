@@ -51,7 +51,7 @@ def listar_documentos(
     for d in docs:
         dr = DocumentoResponse.from_orm(d)
         dr.has_xml = bool(d.xml_path and Path(d.xml_path).exists())
-        dr.has_danfe = bool(d.danfe_path and Path(d.danfe_path).exists())
+        dr.has_danfe = bool(d.danfe_path and Path(d.danfe_path).exists()) or bool(d.xml_path and Path(d.xml_path).exists())
         result.append(dr)
     return result
 
@@ -69,11 +69,26 @@ def download_xml(doc_id: str, db: Session = Depends(get_db)):
 @router.get("/{doc_id}/danfe")
 def download_danfe(doc_id: str, db: Session = Depends(get_db)):
     doc = db.query(Documento).filter(Documento.id == doc_id).first()
-    if not doc or not doc.danfe_path:
-        raise HTTPException(status_code=404, detail="DANFe não encontrado")
-    if not Path(doc.danfe_path).exists():
-        raise HTTPException(status_code=404, detail="Arquivo DANFe não encontrado no servidor")
-    return FileResponse(doc.danfe_path, filename=f"DANFE_{doc.numero_nota}.pdf", media_type="application/pdf")
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+
+    # Se já tem DANFe salvo, retorna direto
+    if doc.danfe_path and Path(doc.danfe_path).exists():
+        return FileResponse(doc.danfe_path, filename=f"DANFE_{doc.numero_nota}.pdf", media_type="application/pdf")
+
+    # Gera DANFe on-demand a partir do XML
+    if doc.xml_path and Path(doc.xml_path).exists():
+        from app.services.tiny_service import gerar_danfe_do_xml
+        xml_content = Path(doc.xml_path).read_text(encoding="utf-8")
+        pdf = gerar_danfe_do_xml(xml_content)
+        if pdf:
+            return StreamingResponse(
+                io.BytesIO(pdf),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename=DANFE_{doc.numero_nota}.pdf"}
+            )
+
+    raise HTTPException(status_code=404, detail="DANFe não disponível para este documento")
 
 
 @router.post("/download-lote")
