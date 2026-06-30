@@ -15,6 +15,46 @@ logger = logging.getLogger(__name__)
 SEFAZ_URL_PROD = "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx"
 SEFAZ_URL_HOM = "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx"
 
+# URLs NFeConsultaProtocolo4 por cUF (primeiros 2 dígitos da chave de acesso)
+_SVRS = "https://nfe.svrs.rs.gov.br/ws/NfeConsulta/NfeConsulta4.asmx"
+CONSULTA_URLS_PROD = {
+    "11": "https://nfe.sefin.ro.gov.br/nfe/NFeConsulta4",
+    "13": "https://nfe.sefaz.am.gov.br/services/NfeConsulta4",
+    "15": "https://nfe.sefa.pa.gov.br/nfe/NFeConsulta4",
+    "21": "https://nfe.sefaz.ma.gov.br/nfe/NFeConsulta4",
+    "31": "https://nfe.fazenda.mg.gov.br/nfe2/services/NFeConsulta4",
+    "35": "https://nfe.fazenda.sp.gov.br/ws/nfeconsulta4.asmx",
+    "41": "https://nfe.fazenda.pr.gov.br/nfe/NFeConsulta4",
+    "51": "https://nfe.sefaz.mt.gov.br/nfews/v2/services/NfeConsulta4",
+}
+CONSULTA_URLS_HOM = {
+    "35": "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsulta4.asmx",
+    "31": "https://hnfe.fazenda.mg.gov.br/nfe2/services/NFeConsulta4",
+}
+
+SOAP_CONSULTA = """<?xml version="1.0" encoding="UTF-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Header>
+    <nfeCabecMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4">
+      <cUF>{cuf}</cUF>
+      <versaoDados>4.00</versaoDados>
+    </nfeCabecMsg>
+  </soap12:Header>
+  <soap12:Body>
+    <nfeConsultaNF xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeConsultaProtocolo4">
+      <nfeDadosMsg>
+        <consSitNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+          <tpAmb>{ambiente}</tpAmb>
+          <xServ>CONSULTAR</xServ>
+          <chNFe>{chave}</chNFe>
+        </consSitNFe>
+      </nfeDadosMsg>
+    </nfeConsultaNF>
+  </soap12:Body>
+</soap12:Envelope>"""
+
 SOAP_ENVELOPE = """<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -196,6 +236,50 @@ def extrair_metadados_nfe(xml_str: str) -> Dict:
     except Exception as e:
         logger.error(f"Erro ao extrair metadados NF-e: {e}")
         return {}
+
+
+def buscar_nfe_por_chave(chave: str, pfx_path: str, senha_cifrada: str, ambiente: str = "1") -> Optional[str]:
+    """
+    Consulta NFeConsultaProtocolo4 pelo chave de acesso e retorna o XML completo da NF-e.
+    Usado para notas UNO que não têm XML armazenado localmente.
+    """
+    import requests, tempfile
+
+    cuf = chave[:2]
+    urls = CONSULTA_URLS_HOM if ambiente == "2" else CONSULTA_URLS_PROD
+    url = urls.get(cuf, _SVRS)
+
+    cert_pem, key_pem = carregar_certificado(pfx_path, senha_cifrada)
+    soap_body = SOAP_CONSULTA.format(cuf=cuf, ambiente=ambiente, chave=chave)
+    headers = {"Content-Type": "application/soap+xml; charset=utf-8", "SOAPAction": ""}
+
+    with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as cf:
+        cf.write(cert_pem); cert_tmp = cf.name
+    with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as kf:
+        kf.write(key_pem); key_tmp = kf.name
+
+    try:
+        ca_bundle = "/etc/ssl/certs/ca-certificates.crt"
+        if not os.path.exists(ca_bundle):
+            import certifi; ca_bundle = certifi.where()
+        resp = requests.post(url, data=soap_body.encode("utf-8"), headers=headers,
+                             cert=(cert_tmp, key_tmp), timeout=60, verify=ca_bundle)
+        resp.raise_for_status()
+        root = etree.fromstring(resp.content)
+        proc = root.find(".//{http://www.portalfiscal.inf.br/nfe}procNFe")
+        if proc is not None:
+            return etree.tostring(proc, encoding="unicode")
+        nfe_el = root.find(".//{http://www.portalfiscal.inf.br/nfe}NFe")
+        if nfe_el is not None:
+            return etree.tostring(nfe_el, encoding="unicode")
+        logger.warning(f"NFeConsultaProtocolo: sem XML para chave {chave}. Body: {resp.text[:500]}")
+        return None
+    except Exception as e:
+        logger.error(f"Erro NFeConsultaProtocolo chave {chave}: {e}")
+        return None
+    finally:
+        os.unlink(cert_tmp)
+        os.unlink(key_tmp)
 
 
 import re

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import api from '@/lib/api'
-import { Download, FileText, FileSearch, RefreshCw, ChevronDown } from 'lucide-react'
+import { Download, FileText, FileSearch, RefreshCw, ChevronDown, CloudDownload } from 'lucide-react'
 
 interface Empresa { id: string; razao_social: string; nome_fantasia?: string; cnpj: string; ativa: boolean }
 interface Documento {
@@ -74,6 +74,7 @@ export default function DocumentosPage() {
   const [selecionados, setSelecionados] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [coletando, setColetando] = useState<string | null>(null)
+  const [buscandoSefaz, setBuscandoSefaz] = useState<string | null>(null)
   const [filtros, setFiltros] = useState({
     empresa_id: [] as string[],
     fonte: [] as string[],
@@ -127,6 +128,24 @@ export default function DocumentosPage() {
     const url = URL.createObjectURL(resp.data)
     const a = document.createElement('a'); a.href = url; a.download = nome; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const buscarXmlSefaz = async (id: string, tipo: 'xml' | 'danfe', chave: string, num?: string) => {
+    setBuscandoSefaz(id + tipo)
+    try {
+      const endpoint = tipo === 'xml' ? 'buscar-xml' : 'buscar-danfe'
+      const resp = await api.post(`/documentos/${endpoint}/${id}`, null, { responseType: 'blob' })
+      const ext = tipo === 'xml' ? 'xml' : 'pdf'
+      const nome = tipo === 'xml' ? `${chave}.${ext}` : `DANFE_${num || chave}.${ext}`
+      const url = URL.createObjectURL(resp.data)
+      const a = document.createElement('a'); a.href = url; a.download = nome; a.click()
+      URL.revokeObjectURL(url)
+      load() // recarrega para atualizar has_xml/has_danfe
+    } catch {
+      alert('Não foi possível obter o XML no SEFAZ. Verifique se o certificado está configurado.')
+    } finally {
+      setBuscandoSefaz(null)
+    }
   }
 
   const coletar = async (empresaId: string) => {
@@ -284,17 +303,35 @@ export default function DocumentosPage() {
                       </span>
                     </td>
                     <td className="p-3">
-                      <div className="flex gap-1">
-                        {doc.has_xml && (
-                          <button onClick={() => downloadArquivo(doc.id, 'xml', doc.chave_acesso)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Baixar XML">
+                      <div className="flex gap-1 items-center">
+                        {doc.has_xml ? (
+                          <button onClick={() => downloadArquivo(doc.id, 'xml', doc.chave_acesso)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Baixar XML">
                             <FileText size={16} />
                           </button>
-                        )}
-                        {doc.has_danfe && (
-                          <button onClick={() => downloadArquivo(doc.id, 'danfe', doc.chave_acesso, doc.numero_nota)} className="p-1.5 text-kami-red hover:bg-kami-red/10 rounded" title="Baixar DANFe">
+                        ) : doc.fonte === 'uno' ? (
+                          <button onClick={() => buscarXmlSefaz(doc.id, 'xml', doc.chave_acesso)}
+                            disabled={buscandoSefaz === doc.id + 'xml'}
+                            className="p-1.5 text-blue-400 hover:bg-blue-50 rounded disabled:opacity-40" title="Buscar XML no SEFAZ">
+                            {buscandoSefaz === doc.id + 'xml'
+                              ? <RefreshCw size={15} className="animate-spin" />
+                              : <CloudDownload size={15} />}
+                          </button>
+                        ) : null}
+                        {doc.has_danfe ? (
+                          <button onClick={() => downloadArquivo(doc.id, 'danfe', doc.chave_acesso, doc.numero_nota)}
+                            className="p-1.5 text-kami-red hover:bg-kami-red/10 rounded" title="Baixar DANFe">
                             <Download size={16} />
                           </button>
-                        )}
+                        ) : doc.fonte === 'uno' ? (
+                          <button onClick={() => buscarXmlSefaz(doc.id, 'danfe', doc.chave_acesso, doc.numero_nota)}
+                            disabled={buscandoSefaz === doc.id + 'danfe'}
+                            className="p-1.5 text-kami-red/50 hover:bg-kami-red/10 rounded disabled:opacity-40" title="Buscar DANFe no SEFAZ">
+                            {buscandoSefaz === doc.id + 'danfe'
+                              ? <RefreshCw size={15} className="animate-spin" />
+                              : <CloudDownload size={15} />}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
