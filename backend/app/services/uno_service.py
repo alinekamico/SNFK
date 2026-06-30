@@ -64,7 +64,6 @@ def listar_nfe_emitidas(
                 "select": "cod_empresa,cod_nota_fiscal,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe",
                 "situacao": f"eq.{SITUACAO_AUTORIZADA}",
                 "dt_emissao": f"gte.{dt_ini_iso}",
-                "chave_nfe": "not.is.null",
                 "order": "dt_emissao.asc",
                 "limit": size,
                 "offset": page * size,
