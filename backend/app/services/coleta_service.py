@@ -19,7 +19,7 @@ def executar_coleta_todas_empresas(session_factory):
     db: Session = session_factory()
     try:
         empresas = db.query(Empresa).filter(Empresa.ativa == True).all()
-        dt_ini = date.today().replace(day=1).strftime("%d/%m/%Y")
+        dt_ini = "01/01/2019"
         dt_fim = date.today().strftime("%d/%m/%Y")
 
         for empresa in empresas:
