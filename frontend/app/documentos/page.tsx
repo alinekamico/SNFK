@@ -217,8 +217,9 @@ export default function DocumentosPage() {
 
         {/* Tabela */}
         <div className="bg-white rounded-xl border border-kami-charcoal/10 shadow-sm overflow-hidden">
+          <div className="overflow-y-auto max-h-[calc(100vh-320px)]">
           <table className="w-full text-sm">
-            <thead className="bg-kami-charcoal/5 border-b border-kami-charcoal/10">
+            <thead className="bg-kami-charcoal/5 border-b border-kami-charcoal/10 sticky top-0 z-10">
               <tr>
                 <th className="p-3 text-left w-8">
                   <input type="checkbox" onChange={e => setSelecionados(e.target.checked ? docs.map(d => d.id) : [])} />
@@ -276,6 +277,7 @@ export default function DocumentosPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </div>
