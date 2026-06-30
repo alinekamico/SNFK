@@ -128,7 +128,7 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
             if not chave or len(chave) != 44:
                 logger.warning(f"Tiny NF-e {id_nota} sem chave de acesso, pulando")
                 continue
-            if db.query(Documento).filter(Documento.chave_acesso == chave).first():
+            if db.query(Documento).filter(Documento.empresa_id == empresa.id, Documento.chave_acesso == chave).first():
                 continue
 
             xml = tiny_service.obter_xml_nfe(empresa.tiny_token, id_nota)
@@ -188,13 +188,13 @@ def _coletar_uno(db: Session, dt_ini: str, dt_fim: str):
         chave = str(item.get("chave_nfe") or "")
         if not chave or len(chave) != 44:
             continue
-        if db.query(Documento).filter(Documento.chave_acesso == chave).first():
-            continue
 
         cnpj_emit = chave[6:20]
         empresa = empresas_por_cnpj.get(cnpj_emit)
         if not empresa:
             logger.debug(f"UNO: CNPJ {cnpj_emit} não encontrado nas empresas cadastradas")
+            continue
+        if db.query(Documento).filter(Documento.empresa_id == empresa.id, Documento.chave_acesso == chave).first():
             continue
 
         dt_emissao = None
