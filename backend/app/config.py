@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://54.173.44.220:8080"
     UNO_BASE_URL: str = "https://kami.omegasoft.net.br/Kami-api/predict/v1"
     UNO_TOKEN: str = ""
+    UNO_SUPABASE_URL: str = ""
+    UNO_SUPABASE_KEY: str = ""
 
     class Config:
         env_file = ".env"

@@ -5,13 +5,27 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Mapeamento cod_empresa UNO -> CNPJ emitente
+UNO_EMPRESA_CNPJ = {
+    2:  "30917874000179",  # NEXXA
+    4:  "39362018000179",  # ENERGY
+    5:  "39696052000180",  # HAIRPRO
+    10: "36016032000122",  # 3MKO
+}
 
-def _headers() -> dict:
-    return {"Authorization": f"Bearer {settings.UNO_TOKEN}"}
+SITUACAO_AUTORIZADA = 80
 
 
-def _base() -> str:
-    return settings.UNO_BASE_URL.rstrip("/")
+def _supabase_headers() -> dict:
+    return {
+        "apikey": settings.UNO_SUPABASE_KEY,
+        "Authorization": f"Bearer {settings.UNO_SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+
+def _supabase_url(table: str) -> str:
+    return f"{settings.UNO_SUPABASE_URL}/rest/v1/{table}"
 
 
 def listar_nfe_emitidas(
@@ -19,51 +33,66 @@ def listar_nfe_emitidas(
     dt_fim: str,
     cnpj: Optional[str] = None,
     page: int = 0,
-    size: int = 100,
+    size: int = 1000,
 ) -> List[Dict]:
-    """Lista NF-e de venda no UNO. dt_inicio/dt_fim: dd/MM/yyyy"""
+    """Lista NF-e autorizadas do UNO via Supabase REST. dt_inicio/dt_fim: dd/MM/yyyy"""
     try:
+        # Converte dd/MM/yyyy para yyyy-MM-dd
+        from datetime import datetime
+        dt_ini_iso = datetime.strptime(dt_inicio, "%d/%m/%Y").strftime("%Y-%m-%d")
+        dt_fim_iso = datetime.strptime(dt_fim, "%d/%m/%Y").strftime("%Y-%m-%d")
+
         params = {
-            "dtEmissaoInicial": dt_inicio,
-            "dtEmissaoFinal": dt_fim,
-            "page": page,
-            "size": size,
+            "select": "cod_empresa,cod_nota_fiscal,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe",
+            "situacao": f"eq.{SITUACAO_AUTORIZADA}",
+            "dt_emissao": f"gte.{dt_ini_iso}",
+            "dt_emissao": f"lte.{dt_fim_iso}",
+            "chave_nfe": "not.is.null",
+            "order": "dt_emissao.asc",
+            "offset": page * size,
+            "limit": size,
         }
-        if cnpj:
-            params["cnpj"] = cnpj
+
+        # Supabase não aceita dois params com mesmo nome — usa range header
+        headers = _supabase_headers()
+        headers["Range"] = f"{page * size}-{page * size + size - 1}"
 
         resp = requests.get(
-            f"{_base()}/nota-fiscal-venda",
-            headers=_headers(),
-            params=params,
+            f"{settings.UNO_SUPABASE_URL}/rest/v1/vd_nota_fiscal",
+            headers=headers,
+            params={
+                "select": "cod_empresa,cod_nota_fiscal,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe",
+                "situacao": f"eq.{SITUACAO_AUTORIZADA}",
+                "dt_emissao": f"gte.{dt_ini_iso}",
+                "chave_nfe": "not.is.null",
+                "order": "dt_emissao.asc",
+                "limit": size,
+                "offset": page * size,
+            },
             timeout=30,
         )
         resp.raise_for_status()
-        return resp.json() if resp.text else []
+        notas = resp.json() if resp.text else []
+
+        # Filtra até dt_fim
+        from datetime import date
+        dt_fim_date = datetime.strptime(dt_fim, "%d/%m/%Y").date()
+        resultado = []
+        for n in notas:
+            dt = n.get("dt_emissao", "")
+            if dt and dt > dt_fim_iso:
+                continue
+            resultado.append(n)
+        return resultado
     except Exception as e:
-        logger.error(f"Erro UNO listar NF-e: {e}")
+        logger.error(f"Erro UNO Supabase listar NF-e: {e}")
         return []
 
 
-def obter_nfe(cod_nota: int) -> Optional[Dict]:
-    """Obtém detalhes de uma NF-e específica incluindo URLs de XML e PDF."""
-    try:
-        resp = requests.get(
-            f"{_base()}/nota-fiscal-venda/{cod_nota}",
-            headers=_headers(),
-            timeout=30,
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        logger.error(f"Erro UNO obter NF-e {cod_nota}: {e}")
-        return None
-
-
 def baixar_xml(url_xml: str) -> Optional[str]:
-    """Baixa o XML da NF-e a partir da URL retornada pelo UNO."""
+    """Baixa XML via URL (mantido por compatibilidade)."""
     try:
-        resp = requests.get(url_xml, headers=_headers(), timeout=30)
+        resp = requests.get(url_xml, timeout=30)
         resp.raise_for_status()
         return resp.text
     except Exception as e:
@@ -72,9 +101,9 @@ def baixar_xml(url_xml: str) -> Optional[str]:
 
 
 def baixar_pdf(url_pdf: str) -> Optional[bytes]:
-    """Baixa o PDF do DANFe a partir da URL retornada pelo UNO."""
+    """Baixa PDF via URL (mantido por compatibilidade)."""
     try:
-        resp = requests.get(url_pdf, headers=_headers(), timeout=60)
+        resp = requests.get(url_pdf, timeout=60)
         resp.raise_for_status()
         return resp.content
     except Exception as e:

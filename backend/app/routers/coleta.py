@@ -181,44 +181,30 @@ def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
 
 
 def _coletar_uno(db: Session, dt_ini: str, dt_fim: str):
-    logger.info(f"Iniciando coleta UNO ({dt_ini} a {dt_fim})")
+    logger.info(f"Iniciando coleta UNO Supabase ({dt_ini} a {dt_fim})")
     empresas = db.query(Empresa).filter(Empresa.ativa == True).all()
+    empresas_por_cnpj = {e.cnpj: e for e in empresas}
     notas = uno_service.listar_nfe_emitidas(dt_inicio=dt_ini, dt_fim=dt_fim)
     novos = 0
 
     for item in notas:
-        chave = str(item.get("chaveNfe") or "")
+        chave = str(item.get("chave_nfe") or "")
         if not chave or len(chave) != 44:
             continue
         if db.query(Documento).filter(Documento.chave_acesso == chave).first():
             continue
 
         cnpj_emit = chave[6:20]
-        empresa = next((e for e in empresas if e.cnpj == cnpj_emit), None)
+        empresa = empresas_por_cnpj.get(cnpj_emit)
         if not empresa:
+            logger.debug(f"UNO: CNPJ {cnpj_emit} não encontrado nas empresas cadastradas")
             continue
-
-        xml_url = item.get("xml") or ""
-        xml_path = None
-        if xml_url:
-            xml = uno_service.baixar_xml(xml_url)
-            if xml:
-                pasta = os.path.join(settings.STORAGE_PATH, "xml", empresa.cnpj)
-                xml_path = _salvar_arquivo(xml, pasta, f"{chave}.xml")
-
-        pdf_url = item.get("pdf") or ""
-        danfe_path = None
-        if pdf_url:
-            pdf = uno_service.baixar_pdf(pdf_url)
-            if pdf:
-                pasta = os.path.join(settings.STORAGE_PATH, "danfe", empresa.cnpj)
-                danfe_path = _salvar_arquivo(pdf, pasta, f"{chave}.pdf")
 
         dt_emissao = None
         try:
-            dt_str = str(item.get("dtEmissao") or "")
+            dt_str = str(item.get("dt_emissao") or "")
             if dt_str:
-                dt_emissao = datetime.strptime(dt_str, "%d/%m/%Y")
+                dt_emissao = datetime.strptime(dt_str, "%Y-%m-%d")
         except Exception:
             pass
 
@@ -229,16 +215,18 @@ def _coletar_uno(db: Session, dt_ini: str, dt_fim: str):
             fonte="uno",
             cnpj_emitente=cnpj_emit,
             razao_emitente=empresa.razao_social,
-            numero_nota=str(item.get("nrNotaFiscal") or item.get("codNotaFiscal") or ""),
+            cnpj_destinatario=str(item.get("cnpj") or "").replace(".", "").replace("/", "").replace("-", ""),
+            razao_destinatario=str(item.get("razao_social") or ""),
+            numero_nota=str(item.get("nr_nota_fiscal") or ""),
             serie=str(item.get("serie") or ""),
             data_emissao=dt_emissao,
-            valor_total=float(item.get("vlTotalNotaFiscal") or 0),
-            xml_path=xml_path,
-            danfe_path=danfe_path,
+            valor_total=float(item.get("vl_total_nota_fiscal") or 0),
+            xml_path=None,
+            danfe_path=None,
             status="Autorizada",
         )
         db.add(doc)
         novos += 1
 
     db.commit()
-    logger.info(f"Coleta UNO: {novos} novas NF-e")
+    logger.info(f"Coleta UNO Supabase: {novos} novas NF-e")
