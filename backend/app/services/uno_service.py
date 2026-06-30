@@ -21,6 +21,7 @@ def _supabase_headers() -> dict:
         "apikey": settings.UNO_SUPABASE_KEY,
         "Authorization": f"Bearer {settings.UNO_SUPABASE_KEY}",
         "Content-Type": "application/json",
+        "Accept-Profile": "unia",
     }
 
 
