@@ -21,7 +21,6 @@ def _supabase_headers() -> dict:
         "apikey": settings.UNO_SUPABASE_KEY,
         "Authorization": f"Bearer {settings.UNO_SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Accept-Profile": "unia",
     }
 
 
@@ -59,7 +58,7 @@ def listar_nfe_emitidas(
         headers["Range"] = f"{page * size}-{page * size + size - 1}"
 
         resp = requests.get(
-            f"{settings.UNO_SUPABASE_URL}/rest/v1/vd_nota_fiscal",
+            f"{settings.UNO_SUPABASE_URL}/rest/v1/vd_nota_fiscal_snfk",
             headers=headers,
             params={
                 "select": "cod_empresa,cod_nota_fiscal,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe",
