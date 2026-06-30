@@ -216,67 +216,91 @@ export default function DocumentosPage() {
         </div>
 
         {/* Tabela */}
-        <div className="bg-white rounded-xl border border-kami-charcoal/10 shadow-sm overflow-hidden">
-          <div className="overflow-y-auto max-h-[calc(100vh-320px)]">
-          <table className="w-full text-sm">
-            <thead className="bg-kami-charcoal/5 border-b border-kami-charcoal/10 sticky top-0 z-10">
+        <div className="rounded-xl border border-kami-charcoal/10 shadow-sm overflow-hidden bg-white">
+          {/* Cabeçalho fixo fora do scroll */}
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col className="w-8" />
+              <col className="w-[28%]" />
+              <col className="w-[10%]" />
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[8%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+            </colgroup>
+            <thead className="bg-[#f5f3f0] border-b-2 border-kami-charcoal/15">
               <tr>
-                <th className="p-3 text-left w-8">
+                <th className="p-3 text-left">
                   <input type="checkbox" onChange={e => setSelecionados(e.target.checked ? docs.map(d => d.id) : [])} />
                 </th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Emitente / Destinatário</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Nº Nota</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Emissão</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Valor</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Fonte</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Status</th>
-                <th className="p-3 text-left font-body font-medium text-kami-charcoal/60">Downloads</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Emitente / Destinatário</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Nº Nota</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Emissão</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Valor</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Fonte</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Status</th>
+                <th className="p-3 text-left font-body font-semibold text-kami-charcoal/70 text-xs uppercase tracking-wider">Downloads</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-kami-charcoal/5">
-              {loading && <tr><td colSpan={8} className="text-center py-8 text-kami-charcoal/40 font-body">Carregando...</td></tr>}
-              {!loading && docs.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-12 text-kami-charcoal/40 font-body">
-                  <FileSearch className="mx-auto mb-2 text-kami-charcoal/20" size={32} />
-                  Nenhum documento encontrado
-                </td></tr>
-              )}
-              {docs.map(doc => (
-                <tr key={doc.id} className="hover:bg-kami-cream/50">
-                  <td className="p-3"><input type="checkbox" checked={selecionados.includes(doc.id)} onChange={() => toggleSel(doc.id)} /></td>
-                  <td className="p-3">
-                    <p className="font-medium text-kami-charcoal truncate max-w-[200px]">{doc.razao_emitente || '—'}</p>
-                    <p className="text-xs text-kami-charcoal/40 truncate max-w-[200px] font-body">→ {doc.razao_destinatario || '—'}</p>
-                  </td>
-                  <td className="p-3 font-mono text-kami-charcoal/70">{doc.numero_nota || '—'}</td>
-                  <td className="p-3 text-kami-charcoal/70 font-body">{fmtData(doc.data_emissao)}</td>
-                  <td className="p-3 font-medium text-kami-charcoal">{fmtValor(doc.valor_total)}</td>
-                  <td className="p-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-body font-medium bg-kami-charcoal/10 text-kami-charcoal/70 uppercase">{doc.fonte}</span>
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-body ${doc.status === 'Autorizada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {doc.status || '—'}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-1">
-                      {doc.has_xml && (
-                        <button onClick={() => downloadArquivo(doc.id, 'xml', doc.chave_acesso)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Baixar XML">
-                          <FileText size={16} />
-                        </button>
-                      )}
-                      {doc.has_danfe && (
-                        <button onClick={() => downloadArquivo(doc.id, 'danfe', doc.chave_acesso, doc.numero_nota)} className="p-1.5 text-kami-red hover:bg-kami-red/10 rounded" title="Baixar DANFe">
-                          <Download size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
           </table>
+          {/* Corpo com scroll */}
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-8" />
+                <col className="w-[28%]" />
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
+                <col className="w-[8%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+              </colgroup>
+              <tbody className="divide-y divide-kami-charcoal/5">
+                {loading && <tr><td colSpan={8} className="text-center py-8 text-kami-charcoal/40 font-body">Carregando...</td></tr>}
+                {!loading && docs.length === 0 && (
+                  <tr><td colSpan={8} className="text-center py-12 text-kami-charcoal/40 font-body">
+                    <FileSearch className="mx-auto mb-2 text-kami-charcoal/20" size={32} />
+                    Nenhum documento encontrado
+                  </td></tr>
+                )}
+                {docs.map(doc => (
+                  <tr key={doc.id} className="hover:bg-kami-cream/40 transition-colors">
+                    <td className="p-3"><input type="checkbox" checked={selecionados.includes(doc.id)} onChange={() => toggleSel(doc.id)} /></td>
+                    <td className="p-3">
+                      <p className="font-medium text-kami-charcoal truncate">{doc.razao_emitente || '—'}</p>
+                      <p className="text-xs text-kami-charcoal/40 truncate font-body">→ {doc.razao_destinatario || '—'}</p>
+                    </td>
+                    <td className="p-3 font-mono text-kami-charcoal/70 text-sm">{doc.numero_nota || '—'}</td>
+                    <td className="p-3 text-kami-charcoal/70 font-body">{fmtData(doc.data_emissao)}</td>
+                    <td className="p-3 font-medium text-kami-charcoal">{fmtValor(doc.valor_total)}</td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-body font-medium bg-kami-charcoal/10 text-kami-charcoal/70 uppercase">{doc.fonte}</span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-body font-medium ${doc.status === 'Autorizada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {doc.status || '—'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-1">
+                        {doc.has_xml && (
+                          <button onClick={() => downloadArquivo(doc.id, 'xml', doc.chave_acesso)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Baixar XML">
+                            <FileText size={16} />
+                          </button>
+                        )}
+                        {doc.has_danfe && (
+                          <button onClick={() => downloadArquivo(doc.id, 'danfe', doc.chave_acesso, doc.numero_nota)} className="p-1.5 text-kami-red hover:bg-kami-red/10 rounded" title="Baixar DANFe">
+                            <Download size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </main>
