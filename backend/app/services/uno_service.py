@@ -53,36 +53,17 @@ def listar_nfe_emitidas(
             "limit": size,
         }
 
-        # Supabase não aceita dois params com mesmo nome — usa range header
-        headers = _supabase_headers()
-        headers["Range"] = f"{page * size}-{page * size + size - 1}"
-
-        resp = requests.get(
-            f"{settings.UNO_SUPABASE_URL}/rest/v1/vd_nota_fiscal_snfk",
-            headers=headers,
-            params={
-                "select": "cod_empresa,cod_nota_fiscal,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe",
-                "situacao": f"eq.{SITUACAO_AUTORIZADA}",
-                "dt_emissao": f"gte.{dt_ini_iso}",
-                "order": "dt_emissao.asc",
-                "limit": size,
-                "offset": page * size,
-            },
-            timeout=30,
+        url = (
+            f"{settings.UNO_SUPABASE_URL}/rest/v1/vd_nota_fiscal_snfk"
+            f"?select=cod_empresa,nr_nota_fiscal,serie,situacao,dt_emissao,cnpj,razao_social,vl_total_nota_fiscal,chave_nfe"
+            f"&situacao=eq.{SITUACAO_AUTORIZADA}"
+            f"&dt_emissao=gte.{dt_ini_iso}"
+            f"&dt_emissao=lte.{dt_fim_iso}"
+            f"&limit={size}&offset={page * size}"
         )
+        resp = requests.get(url, headers=_supabase_headers(), timeout=30)
         resp.raise_for_status()
-        notas = resp.json() if resp.text else []
-
-        # Filtra até dt_fim
-        from datetime import date
-        dt_fim_date = datetime.strptime(dt_fim, "%d/%m/%Y").date()
-        resultado = []
-        for n in notas:
-            dt = n.get("dt_emissao", "")
-            if dt and dt > dt_fim_iso:
-                continue
-            resultado.append(n)
-        return resultado
+        return resp.json() if resp.text else []
     except Exception as e:
         logger.error(f"Erro UNO Supabase listar NF-e: {e}")
         return []
