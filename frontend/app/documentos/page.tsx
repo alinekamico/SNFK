@@ -4,7 +4,7 @@ import Sidebar from '@/components/Sidebar'
 import api from '@/lib/api'
 import { Download, FileText, FileSearch, RefreshCw, ChevronDown } from 'lucide-react'
 
-interface Empresa { id: string; razao_social: string; cnpj: string; ativa: boolean }
+interface Empresa { id: string; razao_social: string; nome_fantasia?: string; cnpj: string; ativa: boolean }
 interface Documento {
   id: string; chave_acesso: string; tipo: string; fonte: string
   razao_emitente?: string; razao_destinatario?: string
@@ -58,7 +58,7 @@ function EmpresaDropdown({ empresas, selecionadas, onChange }: {
             <label key={e.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-kami-cream cursor-pointer">
               <input type="checkbox" checked={selecionadas.includes(e.id)} onChange={() => toggle(e.id)}
                 className="accent-kami-red" />
-              <span className="text-sm font-body text-kami-charcoal">{e.razao_social}</span>
+              <span className="text-sm font-body text-kami-charcoal">{e.nome_fantasia || e.razao_social}</span>
             </label>
           ))}
         </div>
