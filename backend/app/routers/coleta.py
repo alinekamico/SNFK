@@ -84,9 +84,6 @@ def disparar_coleta_uno(
     data_final: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    if not settings.UNO_TOKEN:
-        raise HTTPException(status_code=400, detail="Token UNO não configurado no servidor")
-
     dt_ini = data_inicial or date.today().replace(day=1).strftime("%d/%m/%Y")
     dt_fim = data_final or date.today().strftime("%d/%m/%Y")
 
@@ -98,7 +95,7 @@ def disparar_coleta_uno(
             db2.close()
 
     background_tasks.add_task(_coleta)
-    return {"ok": True, "message": "Coleta UNO iniciada"}
+    return {"ok": True, "message": f"Coleta UNO iniciada ({dt_ini} a {dt_fim})"}
 
 
 def _coletar_tiny(db: Session, empresa: Empresa, dt_ini: str, dt_fim: str):
@@ -184,7 +181,7 @@ def _coletar_uno(db: Session, dt_ini: str, dt_fim: str):
     logger.info(f"Iniciando coleta UNO Supabase ({dt_ini} a {dt_fim})")
     empresas = db.query(Empresa).filter(Empresa.ativa == True).all()
     empresas_por_cnpj = {e.cnpj: e for e in empresas}
-    notas = uno_service.listar_nfe_emitidas(dt_inicio=dt_ini, dt_fim=dt_fim)
+    notas = uno_service.listar_nfe_todas_paginas(dt_ini, dt_fim)
     novos = 0
 
     for item in notas:
