@@ -245,7 +245,7 @@ export default function DocumentosPage() {
             </thead>
           </table>
           {/* Corpo com scroll */}
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
             <table className="w-full text-sm table-fixed">
               <colgroup>
                 <col className="w-8" />
