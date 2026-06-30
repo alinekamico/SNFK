@@ -1,10 +1,10 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import api from '@/lib/api'
-import { Download, FileText, FileSearch, RefreshCw } from 'lucide-react'
+import { Download, FileText, FileSearch, RefreshCw, ChevronDown } from 'lucide-react'
 
-interface Empresa { id: string; razao_social: string; cnpj: string }
+interface Empresa { id: string; razao_social: string; cnpj: string; ativa: boolean }
 interface Documento {
   id: string; chave_acesso: string; tipo: string; fonte: string
   razao_emitente?: string; razao_destinatario?: string
@@ -14,6 +14,58 @@ interface Documento {
 }
 
 type Aba = 'emitidas' | 'recebidas'
+
+function EmpresaDropdown({ empresas, selecionadas, onChange }: {
+  empresas: Empresa[]
+  selecionadas: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (id: string) =>
+    onChange(selecionadas.includes(id) ? selecionadas.filter(x => x !== id) : [...selecionadas, id])
+
+  const label = selecionadas.length === 0
+    ? 'Todas as empresas'
+    : selecionadas.length === 1
+      ? empresas.find(e => e.id === selecionadas[0])?.razao_social.split(' ').slice(0, 3).join(' ') || '1 empresa'
+      : `${selecionadas.length} empresas`
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 border border-kami-charcoal/20 rounded-lg px-3 py-2 text-sm font-body text-kami-charcoal bg-white hover:border-kami-red min-w-[200px] justify-between"
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown size={14} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 bg-white border border-kami-charcoal/15 rounded-xl shadow-lg w-72 max-h-64 overflow-y-auto">
+          {selecionadas.length > 0 && (
+            <button onClick={() => onChange([])} className="w-full text-left px-4 py-2 text-xs text-kami-red font-body hover:bg-kami-cream border-b border-kami-charcoal/10">
+              Limpar seleção
+            </button>
+          )}
+          {empresas.map(e => (
+            <label key={e.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-kami-cream cursor-pointer">
+              <input type="checkbox" checked={selecionadas.includes(e.id)} onChange={() => toggle(e.id)}
+                className="accent-kami-red" />
+              <span className="text-sm font-body text-kami-charcoal">{e.razao_social}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function DocumentosPage() {
   const [aba, setAba] = useState<Aba>('emitidas')
@@ -46,16 +98,18 @@ export default function DocumentosPage() {
     } finally { setLoading(false) }
   }, [filtros, aba])
 
-  useEffect(() => { api.get('/empresas').then(r => setEmpresas(r.data)) }, [])
+  useEffect(() => {
+    api.get('/empresas').then(r => setEmpresas(r.data.filter((e: Empresa) => e.ativa)))
+  }, [])
   useEffect(() => { load() }, [load])
 
   const toggleSel = (id: string) =>
     setSelecionados(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])
 
-  const toggleFiltroMulti = (campo: 'empresa_id' | 'fonte', valor: string) =>
-    setFiltros(f => ({
-      ...f,
-      [campo]: f[campo].includes(valor) ? f[campo].filter(v => v !== valor) : [...f[campo], valor],
+  const toggleFonte = (f: string) =>
+    setFiltros(prev => ({
+      ...prev,
+      fonte: prev.fonte.includes(f) ? prev.fonte.filter(x => x !== f) : [...prev.fonte, f],
     }))
 
   const downloadLote = async () => {
@@ -83,15 +137,16 @@ export default function DocumentosPage() {
     } finally { setColetando(null) }
   }
 
+  const temFiltro = filtros.empresa_id.length > 0 || filtros.fonte.length > 0 || filtros.data_inicio || filtros.data_fim || filtros.numero_nota
+
   const fmtValor = (v?: number) => v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
   const fmtData = (d?: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+  const fontes = ['sefaz', 'tiny', 'uno']
 
   const chipClass = (ativo: boolean) =>
-    `px-3 py-1 rounded-full text-xs font-medium cursor-pointer border transition-colors ${
+    `px-3 py-1.5 rounded-lg text-xs font-body font-medium cursor-pointer border transition-colors ${
       ativo ? 'bg-kami-red text-white border-kami-red' : 'bg-white text-kami-charcoal border-kami-charcoal/20 hover:border-kami-red hover:text-kami-red'
     }`
-
-  const fontes = ['sefaz', 'tiny', 'uno']
 
   return (
     <div className="flex min-h-screen">
@@ -102,15 +157,12 @@ export default function DocumentosPage() {
           <div className="flex gap-2">
             {selecionados.length > 0 && (
               <button onClick={downloadLote} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-body">
-                <Download size={16} /> Baixar {selecionados.length} selecionados (ZIP)
+                <Download size={16} /> Baixar {selecionados.length} (ZIP)
               </button>
             )}
             {filtros.empresa_id.length === 1 && (
-              <button
-                onClick={() => coletar(filtros.empresa_id[0])}
-                disabled={!!coletando}
-                className="flex items-center gap-2 bg-kami-charcoal text-white px-4 py-2 rounded-lg hover:bg-kami-charcoal/80 text-sm font-body disabled:opacity-50"
-              >
+              <button onClick={() => coletar(filtros.empresa_id[0])} disabled={!!coletando}
+                className="flex items-center gap-2 bg-kami-charcoal text-white px-4 py-2 rounded-lg hover:bg-kami-charcoal/80 text-sm font-body disabled:opacity-50">
                 <RefreshCw size={16} className={coletando ? 'animate-spin' : ''} />
                 {coletando ? 'Coletando...' : 'Coletar SEFAZ'}
               </button>
@@ -121,15 +173,10 @@ export default function DocumentosPage() {
         {/* Abas */}
         <div className="flex gap-2 mb-4">
           {(['emitidas', 'recebidas'] as Aba[]).map(a => (
-            <button
-              key={a}
-              onClick={() => setAba(a)}
+            <button key={a} onClick={() => setAba(a)}
               className={`px-6 py-2.5 rounded-lg font-body text-sm font-medium transition-colors ${
-                aba === a
-                  ? 'bg-kami-red text-white shadow-sm'
-                  : 'bg-white text-kami-charcoal border border-kami-charcoal/15 hover:border-kami-red hover:text-kami-red'
-              }`}
-            >
+                aba === a ? 'bg-kami-red text-white shadow-sm' : 'bg-white text-kami-charcoal border border-kami-charcoal/15 hover:border-kami-red hover:text-kami-red'
+              }`}>
               {a === 'emitidas' ? 'NF-e Emitidas' : 'NF-e Recebidas'}
             </button>
           ))}
@@ -137,40 +184,19 @@ export default function DocumentosPage() {
 
         {/* Filtros */}
         <div className="bg-white rounded-xl border border-kami-charcoal/10 shadow-sm p-4 mb-4 space-y-3">
-          {/* Empresas — múltipla escolha */}
-          <div>
-            <p className="text-xs font-body text-kami-charcoal/50 uppercase tracking-wider mb-2">Empresa</p>
-            <div className="flex flex-wrap gap-2">
-              {empresas.map(e => (
-                <button
-                  key={e.id}
-                  onClick={() => toggleFiltroMulti('empresa_id', e.id)}
-                  className={chipClass(filtros.empresa_id.includes(e.id))}
-                >
-                  {e.razao_social.split(' ').slice(0, 2).join(' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Fonte — múltipla escolha */}
-          <div>
-            <p className="text-xs font-body text-kami-charcoal/50 uppercase tracking-wider mb-2">Fonte</p>
+          <div className="flex flex-wrap gap-3 items-center">
+            <EmpresaDropdown
+              empresas={empresas}
+              selecionadas={filtros.empresa_id}
+              onChange={ids => setFiltros(f => ({ ...f, empresa_id: ids }))}
+            />
             <div className="flex gap-2">
               {fontes.map(f => (
-                <button
-                  key={f}
-                  onClick={() => toggleFiltroMulti('fonte', f)}
-                  className={chipClass(filtros.fonte.includes(f))}
-                >
+                <button key={f} onClick={() => toggleFonte(f)} className={chipClass(filtros.fonte.includes(f))}>
                   {f.toUpperCase()}
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Datas e número */}
-          <div className="flex gap-3 flex-wrap">
             <input type="date" value={filtros.data_inicio}
               onChange={e => setFiltros(f => ({...f, data_inicio: e.target.value}))}
               className="border border-kami-charcoal/20 rounded-lg px-3 py-1.5 text-sm font-body text-kami-charcoal" />
@@ -179,11 +205,11 @@ export default function DocumentosPage() {
               className="border border-kami-charcoal/20 rounded-lg px-3 py-1.5 text-sm font-body text-kami-charcoal" />
             <input placeholder="Nº Nota" value={filtros.numero_nota}
               onChange={e => setFiltros(f => ({...f, numero_nota: e.target.value}))}
-              className="border border-kami-charcoal/20 rounded-lg px-3 py-1.5 text-sm font-body text-kami-charcoal w-32" />
-            {(filtros.empresa_id.length > 0 || filtros.fonte.length > 0 || filtros.data_inicio || filtros.data_fim || filtros.numero_nota) && (
+              className="border border-kami-charcoal/20 rounded-lg px-3 py-1.5 text-sm font-body text-kami-charcoal w-28" />
+            {temFiltro && (
               <button onClick={() => setFiltros({ empresa_id: [], fonte: [], data_inicio: '', data_fim: '', numero_nota: '' })}
                 className="text-xs text-kami-red font-body hover:underline">
-                Limpar filtros
+                Limpar
               </button>
             )}
           </div>
@@ -207,9 +233,7 @@ export default function DocumentosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-kami-charcoal/5">
-              {loading && (
-                <tr><td colSpan={8} className="text-center py-8 text-kami-charcoal/40 font-body">Carregando...</td></tr>
-              )}
+              {loading && <tr><td colSpan={8} className="text-center py-8 text-kami-charcoal/40 font-body">Carregando...</td></tr>}
               {!loading && docs.length === 0 && (
                 <tr><td colSpan={8} className="text-center py-12 text-kami-charcoal/40 font-body">
                   <FileSearch className="mx-auto mb-2 text-kami-charcoal/20" size={32} />
@@ -227,9 +251,7 @@ export default function DocumentosPage() {
                   <td className="p-3 text-kami-charcoal/70 font-body">{fmtData(doc.data_emissao)}</td>
                   <td className="p-3 font-medium text-kami-charcoal">{fmtValor(doc.valor_total)}</td>
                   <td className="p-3">
-                    <span className="px-2 py-0.5 rounded-full text-xs font-body font-medium bg-kami-charcoal/10 text-kami-charcoal/70 uppercase">
-                      {doc.fonte}
-                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-body font-medium bg-kami-charcoal/10 text-kami-charcoal/70 uppercase">{doc.fonte}</span>
                   </td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-body ${doc.status === 'Autorizada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>

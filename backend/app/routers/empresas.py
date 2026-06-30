@@ -56,6 +56,11 @@ def listar_empresas(db: Session = Depends(get_db)):
     return db.query(Empresa).filter(Empresa.ativa == True).order_by(Empresa.razao_social).all()
 
 
+@router.get("/todas", response_model=List[EmpresaResponse])
+def listar_todas_empresas(db: Session = Depends(get_db)):
+    return db.query(Empresa).order_by(Empresa.razao_social).all()
+
+
 @router.post("", response_model=EmpresaResponse)
 def criar_empresa(body: EmpresaCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if db.query(Empresa).filter(Empresa.cnpj == body.cnpj).first():

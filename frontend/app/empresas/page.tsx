@@ -20,9 +20,10 @@ function formatCNPJ(v: string) {
 export default function EmpresasPage() {
   const router = useRouter()
   const [empresas, setEmpresas] = useState<Empresa[]>([])
+  const [filtroAtivo, setFiltroAtivo] = useState<'todas' | 'ativas' | 'inativas'>('ativas')
   const [showForm, setShowForm] = useState(false)
   const [editando, setEditando] = useState<Empresa | null>(null)
-  const [form, setForm] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '' })
+  const [form, setForm] = useState({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '', ativa: true })
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -31,18 +32,22 @@ export default function EmpresasPage() {
     load()
   }, [router])
 
-  const load = () => api.get('/empresas').then(r => setEmpresas(r.data))
+  const load = () => api.get('/empresas/todas').then(r => setEmpresas(r.data)).catch(() => api.get('/empresas').then(r => setEmpresas(r.data)))
+
+  const empresasFiltradas = empresas.filter(e =>
+    filtroAtivo === 'todas' ? true : filtroAtivo === 'ativas' ? e.ativa : !e.ativa
+  )
 
   const abrirEdicao = (e: Empresa) => {
     setEditando(e)
-    setForm({ razao_social: e.razao_social, nome_fantasia: e.nome_fantasia || '', cnpj: e.cnpj, email: e.email || '', tiny_token: e.tiny_token || '' })
+    setForm({ razao_social: e.razao_social, nome_fantasia: e.nome_fantasia || '', cnpj: e.cnpj, email: e.email || '', tiny_token: e.tiny_token || '', ativa: e.ativa })
     setErro('')
     setShowForm(true)
   }
 
   const abrirNovo = () => {
     setEditando(null)
-    setForm({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '' })
+    setForm({ razao_social: '', nome_fantasia: '', cnpj: '', email: '', tiny_token: '', ativa: true })
     setErro('')
     setShowForm(true)
   }
@@ -58,6 +63,7 @@ export default function EmpresasPage() {
           nome_fantasia: form.nome_fantasia,
           email: form.email,
           tiny_token: form.tiny_token || null,
+          ativa: form.ativa,
         })
       } else {
         const cnpjNumeros = form.cnpj.replace(/\D/g, '')
@@ -81,12 +87,22 @@ export default function EmpresasPage() {
       <main className="flex-1 p-8 bg-kami-cream">
         <div className="flex justify-between items-center mb-6">
           <h2 className="font-heading text-3xl text-kami-charcoal">Empresas</h2>
-          <button
-            onClick={abrirNovo}
-            className="flex items-center gap-2 bg-kami-red text-white px-4 py-2.5 rounded-lg hover:bg-kami-red-light transition-colors font-body text-sm"
-          >
+          <button onClick={abrirNovo}
+            className="flex items-center gap-2 bg-kami-red text-white px-4 py-2.5 rounded-lg hover:bg-kami-red-light transition-colors font-body text-sm">
             <Plus size={18} /> Nova Empresa
           </button>
+        </div>
+
+        {/* Filtro ativas/inativas */}
+        <div className="flex gap-2 mb-4">
+          {(['ativas', 'inativas', 'todas'] as const).map(f => (
+            <button key={f} onClick={() => setFiltroAtivo(f)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-body font-medium transition-colors capitalize ${
+                filtroAtivo === f ? 'bg-kami-red text-white' : 'bg-white text-kami-charcoal border border-kami-charcoal/15 hover:border-kami-red hover:text-kami-red'
+              }`}>
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
         </div>
 
         {showForm && (
@@ -109,12 +125,20 @@ export default function EmpresasPage() {
                   </>
                 )}
                 {editando && (
-                  <div className={`${inputClass} bg-kami-charcoal/5 cursor-not-allowed`}>
-                    {form.cnpj}
-                  </div>
+                  <div className={`${inputClass} bg-kami-charcoal/5 cursor-not-allowed`}>{form.cnpj}</div>
                 )}
                 <input type="email" placeholder="E-mail" value={form.email}
                   onChange={e => setForm(f => ({...f, email: e.target.value}))} className={inputClass} />
+
+                {/* Status ativa/inativa */}
+                <div className="flex items-center gap-3 py-1">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={form.ativa} onChange={e => setForm(f => ({...f, ativa: e.target.checked}))} className="sr-only peer" />
+                    <div className="w-10 h-6 bg-kami-charcoal/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-kami-red"></div>
+                  </label>
+                  <span className="text-sm font-body text-kami-charcoal">{form.ativa ? 'Empresa Ativa' : 'Empresa Inativa'}</span>
+                </div>
+
                 <div className="border-t border-kami-charcoal/10 pt-3 mt-1">
                   <p className="text-xs font-body text-kami-charcoal/50 mb-2 uppercase tracking-wider">Integrações</p>
                   <input placeholder="Token API Tiny (opcional)" value={form.tiny_token}
@@ -137,9 +161,11 @@ export default function EmpresasPage() {
         )}
 
         <div className="grid gap-4">
-          {empresas.map(e => (
-            <div key={e.id} className="bg-white rounded-xl border border-kami-charcoal/10 shadow-sm p-5 flex items-center gap-4">
-              <div className="p-3 bg-kami-red/10 rounded-lg text-kami-red"><Building2 size={22} /></div>
+          {empresasFiltradas.map(e => (
+            <div key={e.id} className={`bg-white rounded-xl border shadow-sm p-5 flex items-center gap-4 ${e.ativa ? 'border-kami-charcoal/10' : 'border-kami-charcoal/5 opacity-60'}`}>
+              <div className={`p-3 rounded-lg ${e.ativa ? 'bg-kami-red/10 text-kami-red' : 'bg-kami-charcoal/10 text-kami-charcoal/40'}`}>
+                <Building2 size={22} />
+              </div>
               <div className="flex-1">
                 <p className="font-heading text-lg text-kami-charcoal">{e.razao_social}</p>
                 {e.nome_fantasia && <p className="text-sm text-kami-charcoal/60 font-body">{e.nome_fantasia}</p>}
@@ -155,8 +181,8 @@ export default function EmpresasPage() {
               </button>
             </div>
           ))}
-          {empresas.length === 0 && (
-            <p className="text-kami-charcoal/40 font-body text-center py-12">Nenhuma empresa cadastrada ainda.</p>
+          {empresasFiltradas.length === 0 && (
+            <p className="text-kami-charcoal/40 font-body text-center py-12">Nenhuma empresa encontrada.</p>
           )}
         </div>
       </main>
