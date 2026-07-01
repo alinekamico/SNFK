@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import api from '@/lib/api'
-import { Download, FileText, FileSearch, RefreshCw, ChevronDown, CloudDownload } from 'lucide-react'
+import { Download, FileText, FileSearch, RefreshCw, ChevronDown, Cloud } from 'lucide-react'
 
 interface Empresa { id: string; razao_social: string; nome_fantasia?: string; cnpj: string; ativa: boolean }
 interface Documento {
@@ -315,7 +315,7 @@ export default function DocumentosPage() {
                             className="p-1.5 text-blue-400 hover:bg-blue-50 rounded disabled:opacity-40" title="Buscar XML no SEFAZ">
                             {buscandoSefaz === doc.id + 'xml'
                               ? <RefreshCw size={15} className="animate-spin" />
-                              : <CloudDownload size={15} />}
+                              : <Cloud size={15} />}
                           </button>
                         ) : null}
                         {doc.has_danfe ? (
@@ -329,7 +329,7 @@ export default function DocumentosPage() {
                             className="p-1.5 text-kami-red/50 hover:bg-kami-red/10 rounded disabled:opacity-40" title="Buscar DANFe no SEFAZ">
                             {buscandoSefaz === doc.id + 'danfe'
                               ? <RefreshCw size={15} className="animate-spin" />
-                              : <CloudDownload size={15} />}
+                              : <Cloud size={15} />}
                           </button>
                         ) : null}
                       </div>
